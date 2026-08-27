@@ -127,13 +127,17 @@ export const useStore = create<StoreState>((set, get) => {
     },
 
     async loadDay(date) {
-      set({ dayLoading: true });
+      // Commit the target date synchronously so rapid prev/next presses
+      // compound correctly, and drop responses that arrive after another
+      // navigation superseded them.
+      set({ dayLoading: true, date });
       try {
         const payload = await api.getDay(date);
-        set({ date, tasks: payload.tasks, events: payload.events, dayLoading: false });
+        if (get().date !== date) return;
+        set({ tasks: payload.tasks, events: payload.events, dayLoading: false });
         get().loadCarryover();
       } catch (err) {
-        set({ dayLoading: false });
+        if (get().date === date) set({ dayLoading: false });
         handleError(err, 'Could not load the day');
       }
     },
@@ -152,7 +156,8 @@ export const useStore = create<StoreState>((set, get) => {
     async addTask(input) {
       try {
         const task = await api.createTask({ date: get().date, ...input, title: input.title });
-        set((s) => ({ tasks: [...s.tasks, task] }));
+        // Guard against the user switching days while the request was in flight.
+        set((s) => (s.date === task.date ? { tasks: [...s.tasks, task] } : {}));
       } catch (err) {
         handleError(err, 'Could not add task');
       }

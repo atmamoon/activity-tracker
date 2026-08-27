@@ -61,6 +61,38 @@ describe('expandIcsEvents', () => {
     expect(new Set(events.map((e) => e.summary))).toEqual(new Set(['Morning practice']));
   });
 
+  it('applies a RECURRENCE-ID override exactly once, without duplicating instances', () => {
+    const start = addDays(today, -1);
+    const overrideDay = addDays(start, 1);
+    const data = parseIcsString(
+      fixture(
+        [
+          'BEGIN:VEVENT',
+          'UID:ovr@test',
+          `DTSTART:${ymd(start)}T070000Z`,
+          `DTEND:${ymd(start)}T080000Z`,
+          'RRULE:FREQ=DAILY;COUNT=4',
+          'SUMMARY:Base block',
+          'END:VEVENT',
+          'BEGIN:VEVENT',
+          'UID:ovr@test',
+          `RECURRENCE-ID:${ymd(overrideDay)}T070000Z`,
+          `DTSTART:${ymd(overrideDay)}T090000Z`,
+          `DTEND:${ymd(overrideDay)}T100000Z`,
+          'SUMMARY:Moved block',
+          'END:VEVENT',
+        ].join('\r\n')
+      )
+    );
+    const from = new Date(`${addDays(today, -2)}T00:00:00`);
+    const to = new Date(`${addDays(today, 7)}T00:00:00`);
+    const events = expandIcsEvents(data, from, to);
+    // 4 occurrences total: 3 base + 1 overridden, never 5.
+    expect(events).toHaveLength(4);
+    expect(events.filter((e) => e.summary === 'Moved block')).toHaveLength(1);
+    expect(events.filter((e) => e.summary === 'Base block')).toHaveLength(3);
+  });
+
   it('handles all-day events', () => {
     const data = parseIcsString(
       fixture(

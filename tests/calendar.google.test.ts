@@ -245,6 +245,71 @@ describe('google calendar integration', () => {
     expect(status.body.syncError).toBeTruthy();
   });
 
+  it('push resolves the "primary" alias to the concrete calendar id', async () => {
+    connect(ctx);
+    setSetting(ctx.db, 'push_calendar_id', 'primary');
+    const { body: task } = await request(ctx.app)
+      .post('/api/tasks')
+      .send({ date: today, title: 'Aliased push', planned_start: '11:00' });
+    const push = await request(ctx.app).post(`/api/tasks/${task.id}/push`);
+    // Stored calendar_id must match sync-cache key format (real id, not alias).
+    expect(push.body.calendar_id).toBe('primary-cal');
+    const status = await request(ctx.app).get('/api/calendar/status');
+    expect(status.body.pushCalendarId).toBe('primary-cal');
+  });
+
+  it('a failed Google delete keeps the task linked instead of orphaning the event', async () => {
+    const failing = fakeGoogle();
+    const wrapped = (async (url: any, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'DELETE') {
+        return new Response(JSON.stringify({ error: { message: 'backend exploded' } }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return failing.fetchImpl(url, init);
+    }) as any;
+    const ctx2 = makeApp(wrapped);
+    connect(ctx2);
+    const { body: task } = await request(ctx2.app)
+      .post('/api/tasks')
+      .send({ date: today, title: 'Sticky link', planned_start: '12:00' });
+    await request(ctx2.app).post(`/api/tasks/${task.id}/push`);
+    const res = await request(ctx2.app).post(`/api/tasks/${task.id}/unpush`);
+    expect(res.status).toBe(400);
+    const day = await request(ctx2.app).get(`/api/day/${today}`);
+    const after = day.body.tasks.find((t: any) => t.id === task.id);
+    expect(after.calendar_event_id).not.toBeNull();
+  });
+
+  it('escapes HTML in the oauth callback page', async () => {
+    const res = await request(ctx.app).get(
+      '/api/calendar/google/callback?error=<script>alert(1)</script>&state=forged'
+    );
+    expect(res.status).toBe(400);
+    expect(res.text).not.toContain('<script>alert(1)</script>');
+    expect(res.text).toContain('&lt;script&gt;');
+  });
+
+  it('serves only the active source after a mode switch (no stale cross-source events)', async () => {
+    connect(ctx);
+    fake.events.set('g1', {
+      id: 'g1',
+      calendarId: 'primary-cal',
+      summary: 'Google event',
+      start: { dateTime: `${today}T10:00:00+05:30` },
+      end: { dateTime: `${today}T11:00:00+05:30` },
+    });
+    await request(ctx.app).post('/api/calendar/sync').send({});
+    expect((await request(ctx.app).get(`/api/day/${today}`)).body.events).toHaveLength(1);
+    // Switch to ics mode (no feed configured) — google's cached rows must not leak through.
+    await request(ctx.app).post('/api/calendar/mode').send({ mode: 'ics' });
+    expect((await request(ctx.app).get(`/api/day/${today}`)).body.events).toHaveLength(0);
+    // Switch back — the cache is still there and serves instantly.
+    await request(ctx.app).post('/api/calendar/mode').send({ mode: 'google' });
+    expect((await request(ctx.app).get(`/api/day/${today}`)).body.events).toHaveLength(1);
+  });
+
   it('disconnect clears google events and tokens', async () => {
     connect(ctx);
     fake.events.set('e1', {

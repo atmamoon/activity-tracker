@@ -62,11 +62,15 @@ export function calendarRoutes(
 
   router.get('/calendar/google/callback', async (req, res) => {
     const { code, state, error } = req.query as Record<string, string | undefined>;
+    // Query params and upstream error messages are reflected into HTML —
+    // escape them to keep the callback page XSS-free.
+    const esc = (s: string) =>
+      s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
     const page = (title: string, body: string, ok: boolean) =>
-      `<!doctype html><meta charset="utf-8"><title>${title}</title>
+      `<!doctype html><meta charset="utf-8"><title>${esc(title)}</title>
        <body style="font-family:system-ui;display:grid;place-items:center;height:90vh;background:#0f1115;color:#e5e7eb">
        <div style="text-align:center"><div style="font-size:48px">${ok ? '✅' : '⚠️'}</div>
-       <h2>${title}</h2><p style="color:#9ca3af">${body}</p></div></body>`;
+       <h2>${esc(title)}</h2><p style="color:#9ca3af">${esc(body)}</p></div></body>`;
     const expiry = state ? pendingStates.get(state) : undefined;
     if (state) pendingStates.delete(state);
     if (error) {

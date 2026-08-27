@@ -124,11 +124,15 @@ export async function syncCalendar(
  * date-only strings; timed events as ISO datetimes.
  */
 export function eventsForDay(db: DB, date: string): Array<Record<string, unknown>> {
+  // Only serve events from the active source — after a mode switch the other
+  // source's cache would otherwise show stale (deleted/moved) events forever.
+  const mode = getCalendarMode(db);
+  if (mode === 'none') return [];
   const dayStart = dateAtLocalMidnight(date);
   const dayEnd = dateAtLocalMidnight(addDaysStr(date, 1));
   const all = db
-    .prepare('SELECT * FROM calendar_events')
-    .all() as Array<{ start: string; end: string; all_day: 0 | 1 } & Record<string, unknown>>;
+    .prepare('SELECT * FROM calendar_events WHERE source = ?')
+    .all(mode) as Array<{ start: string; end: string; all_day: 0 | 1 } & Record<string, unknown>>;
   return all
     .filter((ev) => {
       if (ev.all_day) {

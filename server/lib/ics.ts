@@ -73,15 +73,13 @@ export function expandIcsEvents(data: ical.CalendarResponse, from: Date, to: Dat
         let instEnd = new Date(realStart.getTime() + durationMs);
         let instSummary = summary;
 
-        // Per-instance override (RECURRENCE-ID); node-ical keys these by
-        // YYYY-MM-DD of the original occurrence.
-        const candidateKeys = [
-          realStart.toISOString().slice(0, 10),
-          localDate(realStart),
-        ];
-        const overrideKey = candidateKeys.find((k) => item.recurrences?.[k]);
-        if (overrideKey) {
-          const override = item.recurrences[overrideKey];
+        // Per-instance override (RECURRENCE-ID); node-ical keys these by the
+        // UTC YYYY-MM-DD of the original occurrence. Do not fall back to the
+        // local date — near midnight that would attach the override to an
+        // adjacent base instance too.
+        const overrideKey = realStart.toISOString().slice(0, 10);
+        const override = item.recurrences?.[overrideKey];
+        if (override) {
           handledOverrideKeys.add(overrideKey);
           instStart = new Date(override.start);
           instEnd = new Date(override.end ?? instStart.getTime() + durationMs);

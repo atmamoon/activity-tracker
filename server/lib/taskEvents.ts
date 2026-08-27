@@ -1,5 +1,5 @@
 import type { DB } from '../db.ts';
-import { getSetting } from '../db.ts';
+import { getSetting, setSetting } from '../db.ts';
 import { GoogleClient } from './google.ts';
 import { getCalendarMode } from './sync.ts';
 import { dateAtTime, toRfc3339Local } from './time.ts';
@@ -45,7 +45,20 @@ export async function pushTaskToCalendar(db: DB, google: GoogleClient, task: any
     await google.patchEvent(task.calendar_id, task.calendar_event_id, body);
     return db.prepare('SELECT * FROM tasks WHERE id = ?').get(task.id);
   }
-  const calendarId = getPushCalendarId(db);
+  let calendarId = getPushCalendarId(db);
+  if (calendarId === 'primary') {
+    // Resolve the alias to the concrete id so the stored calendar_id matches
+    // the sync cache keys (used for self-conflict exclusion and dedupe).
+    try {
+      const real = (await google.listCalendars()).find((c) => c.primary)?.id;
+      if (real) {
+        calendarId = real;
+        setSetting(db, 'push_calendar_id', real);
+      }
+    } catch {
+      // Fall back to the alias; push still works, dedupe degrades gracefully.
+    }
+  }
   const created = await google.insertEvent(calendarId, body);
   db.prepare('UPDATE tasks SET calendar_event_id = ?, calendar_id = ? WHERE id = ?').run(
     created.id,
@@ -75,14 +88,14 @@ export async function removeTaskEvent(db: DB, google: GoogleClient, task: any): 
   if (getCalendarMode(db) !== 'google' || !google.isConnected()) {
     throw new Error('Google Calendar is not connected');
   }
-  try {
-    await google.deleteEvent(task.calendar_id, task.calendar_event_id);
-  } finally {
-    db.prepare('UPDATE tasks SET calendar_event_id = NULL, calendar_id = NULL WHERE id = ?').run(
-      task.id
-    );
-    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(
-      `${task.calendar_id}:${task.calendar_event_id}`
-    );
-  }
+  // Unlink only after the delete succeeds (deleteEvent already tolerates
+  // 404/410) — otherwise a transient failure would orphan the event on
+  // Google with no way to remove it from the app.
+  await google.deleteEvent(task.calendar_id, task.calendar_event_id);
+  db.prepare('UPDATE tasks SET calendar_event_id = NULL, calendar_id = NULL WHERE id = ?').run(
+    task.id
+  );
+  db.prepare('DELETE FROM calendar_events WHERE id = ?').run(
+    `${task.calendar_id}:${task.calendar_event_id}`
+  );
 }

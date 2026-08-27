@@ -58,6 +58,12 @@ function CalendarTab() {
         .googleCalendars()
         .then((r) => setCalendars(r.calendars))
         .catch(() => setCalendars(null));
+      // Re-seed local selection from the server status — connecting happens
+      // while this tab is mounted, and the callback auto-selects the primary
+      // calendar; stale local state would otherwise clobber it on first click.
+      const cal = useStore.getState().calendar;
+      setSelected(cal?.selectedCalendarIds ?? []);
+      setPushCal(cal?.pushCalendarId ?? 'primary');
     }
   }, [connected]);
 
