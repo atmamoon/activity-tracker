@@ -9,10 +9,34 @@ export interface NormalizedEvent {
 }
 
 /**
+ * rrule (as constructed by node-ical) returns occurrence Dates whose UTC
+ * fields encode host-local wall time rather than a real instant. Recover the
+ * real instant by interpreting the UTC fields as local time; produce window
+ * bounds for `between()` with the inverse transform.
+ */
+function fromFakeUtc(d: Date): Date {
+  return new Date(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate(),
+    d.getUTCHours(),
+    d.getUTCMinutes(),
+    d.getUTCSeconds()
+  );
+}
+
+function toFakeUtc(d: Date): Date {
+  return new Date(
+    Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds())
+  );
+}
+
+const DAY_MS = 24 * 3600 * 1000;
+
+/**
  * Expand parsed ICS data into concrete event instances within [from, to).
  * Handles plain events, recurring events (RRULE) with EXDATEs and
- * per-instance overrides, and applies the standard node-ical DST offset
- * correction for recurrence expansion.
+ * per-instance overrides (RECURRENCE-ID).
  */
 export function expandIcsEvents(data: ical.CalendarResponse, from: Date, to: Date): NormalizedEvent[] {
   const out: NormalizedEvent[] = [];
@@ -26,34 +50,39 @@ export function expandIcsEvents(data: ical.CalendarResponse, from: Date, to: Dat
     if (item.rrule) {
       const durationMs =
         item.end && item.start ? item.end.getTime() - item.start.getTime() : 0;
-      // Widen the window so instances starting before `from` but ending inside it are kept.
-      const windowStart = new Date(from.getTime() - Math.max(durationMs, 0) - 24 * 3600 * 1000);
-      let dates: Date[] = [];
+      // Pad a day on both sides to absorb the fake-UTC offset skew, then
+      // filter precisely against the real window below.
+      const windowStart = toFakeUtc(new Date(from.getTime() - Math.max(durationMs, 0) - DAY_MS));
+      const windowEnd = toFakeUtc(new Date(to.getTime() + DAY_MS));
+      let occurrences: Date[] = [];
       try {
-        dates = item.rrule.between(windowStart, to, true);
+        occurrences = item.rrule.between(windowStart, windowEnd, true);
       } catch {
-        dates = [];
+        occurrences = [];
       }
-      const exdates = new Set<string>(
-        Object.values(item.exdate ?? {}).map((d: any) => new Date(d).toISOString())
+      const exdateTimes = new Set<number>(
+        Object.values(item.exdate ?? {}).map((d: any) => new Date(d).getTime())
       );
-      for (const occurrence of dates) {
-        let start = new Date(occurrence);
-        // node-ical README DST correction: rrule returns dates assuming the
-        // dtstart offset; shift by the difference in tz offsets.
-        const offsetDiff = start.getTimezoneOffset() - item.start.getTimezoneOffset();
-        if (offsetDiff !== 0) start = new Date(start.getTime() + offsetDiff * 60 * 1000);
+      const handledOverrideKeys = new Set<string>();
 
-        const occKeyIso = new Date(occurrence).toISOString();
-        if (exdates.has(occKeyIso)) continue;
+      for (const occurrence of occurrences) {
+        const realStart = fromFakeUtc(occurrence);
+        if (exdateTimes.has(realStart.getTime())) continue;
 
-        // Per-instance override (RECURRENCE-ID)
-        let instStart = start;
-        let instEnd = new Date(start.getTime() + durationMs);
+        let instStart = realStart;
+        let instEnd = new Date(realStart.getTime() + durationMs);
         let instSummary = summary;
-        const overrideKey = occKeyIso.slice(0, 10);
-        const override = item.recurrences?.[overrideKey];
-        if (override) {
+
+        // Per-instance override (RECURRENCE-ID); node-ical keys these by
+        // YYYY-MM-DD of the original occurrence.
+        const candidateKeys = [
+          realStart.toISOString().slice(0, 10),
+          localDate(realStart),
+        ];
+        const overrideKey = candidateKeys.find((k) => item.recurrences?.[k]);
+        if (overrideKey) {
+          const override = item.recurrences[overrideKey];
+          handledOverrideKeys.add(overrideKey);
           instStart = new Date(override.start);
           instEnd = new Date(override.end ?? instStart.getTime() + durationMs);
           if (override.summary) {
@@ -63,17 +92,22 @@ export function expandIcsEvents(data: ical.CalendarResponse, from: Date, to: Dat
         }
         if (instEnd <= from || instStart >= to) continue;
         out.push(
-          normalize(`${item.uid ?? key}:${occKeyIso}`, instSummary, instStart, instEnd, isAllDay)
+          normalize(
+            `${item.uid ?? key}:${realStart.toISOString()}`,
+            instSummary,
+            instStart,
+            instEnd,
+            isAllDay
+          )
         );
       }
-      // Overrides may move an instance into the window even when the base
-      // occurrence is outside it; recurrences were handled above via keys,
-      // so also scan any not matched to an occurrence.
+
+      // Overrides can move an instance into the window even when its base
+      // occurrence falls outside the expansion above.
       for (const [rkey, override] of Object.entries<any>(item.recurrences ?? {})) {
+        if (handledOverrideKeys.has(rkey)) continue;
         const oStart = new Date(override.start);
-        const oEnd = new Date(override.end ?? oStart);
-        const already = out.some((e) => e.id === `${item.uid ?? key}:${new Date(rkey).toISOString()}`);
-        if (already) continue;
+        const oEnd = new Date(override.end ?? oStart.getTime() + durationMs);
         if (oEnd <= from || oStart >= to) continue;
         const oSummary =
           typeof override.summary === 'string' ? override.summary : (override.summary?.val ?? summary);

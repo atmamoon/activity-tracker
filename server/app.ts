@@ -13,9 +13,10 @@ export interface AppOptions {
   db: DB;
   port: number;
   fetchImpl?: FetchLike;
+  icsFetcher?: (url: string) => Promise<any>;
 }
 
-export function createApp({ db, port, fetchImpl }: AppOptions) {
+export function createApp({ db, port, fetchImpl, icsFetcher }: AppOptions) {
   const app = express();
   const google = new GoogleClient(db, fetchImpl);
 
@@ -25,7 +26,7 @@ export function createApp({ db, port, fetchImpl }: AppOptions) {
   app.use('/api', bookRoutes(db));
   app.use('/api', templateRoutes(db));
   app.use('/api', categoryRoutes(db));
-  app.use('/api', calendarRoutes(db, google, port));
+  app.use('/api', calendarRoutes(db, google, port, icsFetcher));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

@@ -13,7 +13,12 @@ import { localToday } from '../lib/materialize.ts';
 const SYNC_BACK_DAYS = 7;
 const SYNC_FORWARD_DAYS = 45;
 
-export function calendarRoutes(db: DB, google: GoogleClient, serverPort: number): Router {
+export function calendarRoutes(
+  db: DB,
+  google: GoogleClient,
+  serverPort: number,
+  icsFetcher?: (url: string) => Promise<any>
+): Router {
   const router = Router();
   // Short-lived OAuth state tokens (CSRF protection for the loopback flow).
   const pendingStates = new Map<string, number>();
@@ -160,7 +165,9 @@ export function calendarRoutes(db: DB, google: GoogleClient, serverPort: number)
     const from = isValidDateStr(body.from) ? body.from : addDaysStr(today, -SYNC_BACK_DAYS);
     const to = isValidDateStr(body.to) ? body.to : addDaysStr(today, SYNC_FORWARD_DAYS);
     try {
-      const result = await syncCalendar(db, google, from, to);
+      const result = icsFetcher
+        ? await syncCalendar(db, google, from, to, icsFetcher)
+        : await syncCalendar(db, google, from, to);
       res.json({ ...result, status: status() });
     } catch (err) {
       const message = (err as Error).message;

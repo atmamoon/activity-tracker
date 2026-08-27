@@ -102,7 +102,7 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
       db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values);
     }
 
-    const updated = getTask(task.id);
+    let updated = getTask(task.id);
     // Keep a pushed calendar event in sync with title/time/date edits.
     let warning: string | undefined;
     if (
@@ -114,6 +114,8 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
       } catch (err) {
         warning = `Saved locally, but updating the calendar event failed: ${(err as Error).message}`;
       }
+      // syncTaskEvent may unlink the event (e.g. time removed) — re-read.
+      updated = getTask(task.id);
     }
     res.json(warning ? { ...updated, _warning: warning } : updated);
   });

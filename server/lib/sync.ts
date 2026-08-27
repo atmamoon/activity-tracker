@@ -132,8 +132,10 @@ export function eventsForDay(db: DB, date: string): Array<Record<string, unknown
   return all
     .filter((ev) => {
       if (ev.all_day) {
-        // date-only strings: [start, end) in dates
-        return ev.start <= date && date < (ev.end || ev.start);
+        // Date-only strings, [start, end) exclusive end per RFC 5545; treat a
+        // degenerate end (missing or not after start) as a single-day event.
+        const end = ev.end && ev.end > ev.start ? ev.end : addDaysStr(ev.start, 1);
+        return ev.start <= date && date < end;
       }
       const s = new Date(ev.start);
       const e = new Date(ev.end);
