@@ -136,11 +136,15 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
   router.get('/days/:date/carryover', (req, res) => {
     const date = req.params.date;
     if (!isValidDateStr(date)) return res.status(400).json({ error: 'invalid date' });
+    // Only genuinely-overdue tasks (before today) are offered — when planning
+    // a future day, today's still-active tasks shouldn't be nagged about.
+    const today = localToday();
+    const cutoff = date < today ? date : today;
     const candidates = db
       .prepare(
         `SELECT * FROM tasks WHERE status = 'todo' AND date < ? ORDER BY date DESC, position LIMIT 50`
       )
-      .all(date);
+      .all(cutoff);
     res.json({ candidates });
   });
 

@@ -27,7 +27,13 @@ export default function QuickAdd() {
 
   return (
     <div className="quick-add">
-      <div className="quick-add-row">
+      <form
+        className="quick-add-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
         <span className="quick-add-plus">＋</span>
         <input
           id="quick-add-input"
@@ -36,16 +42,15 @@ export default function QuickAdd() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') submit();
             if (e.key === 'Escape') (e.target as HTMLInputElement).blur();
           }}
         />
         {title.trim() && (
-          <button className="pill-btn accent" onClick={submit}>
+          <button type="submit" className="pill-btn accent">
             Add
           </button>
         )}
-      </div>
+      </form>
       <div className="quick-add-cats">
         {activeCategories.map((c) => (
           <button

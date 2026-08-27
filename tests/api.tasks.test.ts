@@ -126,6 +126,18 @@ describe('tasks API', () => {
     expect(carried.carried_from).toBe(yesterday);
   });
 
+  it('carryover candidates for a future day exclude today\'s still-active tasks', async () => {
+    await request(ctx.app).post('/api/tasks').send({ date: today, title: 'active today' });
+    ctx.db
+      .prepare(
+        `INSERT INTO tasks (id, date, title, status, position, created_at)
+         VALUES ('overdue', ?, 'overdue task', 'todo', 10, 'x')`
+      )
+      .run(yesterday);
+    const res = await request(ctx.app).get(`/api/days/${tomorrow}/carryover`);
+    expect(res.body.candidates.map((t: any) => t.id)).toEqual(['overdue']);
+  });
+
   it('deletes a task', async () => {
     const { body: task } = await request(ctx.app).post('/api/tasks').send({ date: today, title: 'x' });
     const del = await request(ctx.app).delete(`/api/tasks/${task.id}`);

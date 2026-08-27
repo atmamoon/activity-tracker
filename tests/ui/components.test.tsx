@@ -113,7 +113,7 @@ describe('QuickAdd', () => {
     fireEvent.click(screen.getByText('Data Questions'));
     const input = screen.getByPlaceholderText(/Add a task/);
     fireEvent.change(input, { target: { value: 'New drill' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.submit(input.closest('form')!);
     await vi.waitFor(() => {
       expect(useStore.getState().tasks.some((t) => t.id === 't2')).toBe(true);
     });
@@ -128,7 +128,7 @@ describe('QuickAdd', () => {
     render(<QuickAdd />);
     const input = screen.getByPlaceholderText(/Add a task/);
     fireEvent.change(input, { target: { value: '   ' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.submit(input.closest('form')!);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

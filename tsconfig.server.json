@@ -13,5 +13,6 @@
     "strict": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["server", "shared", "tests"]
+  "include": ["server", "shared", "tests"],
+  "exclude": ["tests/ui", "tests/setup.ts"]
 }

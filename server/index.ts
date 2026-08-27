@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { openDb } from './db.ts';
 import { createApp } from './app.ts';
 
-const PORT = Number(process.env.PORT ?? 4820);
+const PORT = Number(process.env.API_PORT ?? 4820);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dbPath = process.env.DB_PATH ?? path.join(root, 'data', 'tracker.db');
 
