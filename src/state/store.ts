@@ -212,13 +212,17 @@ export const useStore = create<StoreState>((set, get) => {
     },
 
     async reorderTasks(orderedIds) {
+      const date = get().date;
       const byId = new Map(get().tasks.map((t) => [t.id, t]));
       const reordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as Task[];
       const rest = get().tasks.filter((t) => !orderedIds.includes(t.id));
       set({ tasks: [...reordered, ...rest] });
       try {
-        const res = await api.reorderDay(get().date, orderedIds);
-        set((s) => (s.date === res.tasks[0]?.date || res.tasks.length === 0 ? { tasks: res.tasks } : {}));
+        const res = await api.reorderDay(date, orderedIds);
+        // Reordering can auto-reschedule times to match the new order —
+        // pick up the fresh times, but only if the user hasn't navigated away.
+        set((s) => (s.date === date ? { tasks: res.tasks } : {}));
+        (res.warnings ?? []).forEach((w) => get().toast('info', w));
       } catch (err) {
         handleError(err, 'Could not save the new order');
         get().loadDay(get().date);

@@ -203,11 +203,30 @@ describe('google calendar integration', () => {
     expect(fake.events.has('ev-1')).toBe(false);
   });
 
-  it('refuses to push a task without a start time', async () => {
+  it('auto-schedules a task created with no time and allows pushing it immediately', async () => {
     connect(ctx);
     const { body: task } = await request(ctx.app)
       .post('/api/tasks')
-      .send({ date: today, title: 'No time set' });
+      .send({ date: today, title: 'No time given' });
+    expect(task.planned_start).toBeTruthy();
+    expect(task.planned_minutes).toBeGreaterThan(0);
+    const push = await request(ctx.app).post(`/api/tasks/${task.id}/push`);
+    expect(push.status).toBe(200);
+  });
+
+  it('refuses to push a task the scheduler could not fit anywhere today', async () => {
+    connect(ctx);
+    // Occupy the entire day so auto-scheduling has nowhere to place a new task.
+    ctx.db
+      .prepare(
+        `INSERT INTO tasks (id, date, title, status, position, planned_start, planned_minutes, auto_time, created_at)
+         VALUES ('blocker', ?, 'All-day blocker', 'todo', 5, '00:00', 1440, 0, 'x')`
+      )
+      .run(today);
+    const { body: task } = await request(ctx.app)
+      .post('/api/tasks')
+      .send({ date: today, title: 'No room left' });
+    expect(task.planned_start).toBeNull();
     const res = await request(ctx.app).post(`/api/tasks/${task.id}/push`);
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/start time/i);

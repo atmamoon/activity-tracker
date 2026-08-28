@@ -25,6 +25,7 @@ const task: Task = {
   position: 10,
   planned_start: '15:30',
   planned_minutes: 60,
+  auto_time: 0,
   calendar_event_id: null,
   calendar_id: null,
   template_id: null,

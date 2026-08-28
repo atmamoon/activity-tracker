@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -102,13 +102,38 @@ function BookCard({ book, readNext }: { book: Book; readNext: boolean }) {
   );
 }
 
+const COLLAPSE_KEY = 'activity-tracker:books-collapsed';
+
+function loadCollapsed(): boolean {
+  try {
+    const stored = window.localStorage.getItem(COLLAPSE_KEY);
+    return stored === null ? true : stored === '1'; // collapsed by default
+  } catch {
+    return true;
+  }
+}
+
 export default function BooksShelf() {
   const books = useStore((s) => s.books);
   const reorderBooks = useStore((s) => s.reorderBooks);
   const setEditingBook = useStore((s) => s.setEditingBook);
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+
+  const toggleCollapsed = () => {
+    setCollapsed((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0');
+      } catch {
+        // Private-browsing or storage disabled — collapse state just won't persist.
+      }
+      return next;
+    });
+  };
 
   const open = useMemo(() => books.filter((b) => b.status !== 'finished'), [books]);
   const finishedCount = books.length - open.length;
+  const readNext = open[0];
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -127,32 +152,49 @@ export default function BooksShelf() {
   };
 
   return (
-    <div className="books-shelf">
+    <div className={`books-shelf ${collapsed ? 'collapsed' : ''}`}>
       <div className="books-head">
-        <span className="panel-title">📚 Reading</span>
-        <span className="books-sub">
-          drag to set what to read next
-          {finishedCount > 0 ? ` · ${finishedCount} finished` : ''}
-        </span>
+        <button
+          className="books-collapse-toggle"
+          onClick={toggleCollapsed}
+          aria-expanded={!collapsed}
+        >
+          <span className={`chevron ${collapsed ? '' : 'open'}`}>▸</span>
+          <span className="panel-title">📚 Reading</span>
+        </button>
+        {collapsed ? (
+          readNext && (
+            <span className="books-sub collapsed-summary">
+              Read next: <b>{readNext.title}</b>
+              {open.length > 1 ? ` · +${open.length - 1} more` : ''}
+            </span>
+          )
+        ) : (
+          <span className="books-sub">
+            drag to set what to read next
+            {finishedCount > 0 ? ` · ${finishedCount} finished` : ''}
+          </span>
+        )}
         <button className="pill-btn subtle" onClick={() => setEditingBook('new')}>
           ＋ Add book
         </button>
       </div>
-      {open.length === 0 ? (
-        <div className="books-empty">
-          No books in progress. Add the books you're reading in parallel and order them by priority.
-        </div>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={open.map((b) => b.id)} strategy={horizontalListSortingStrategy}>
-            <div className="books-row">
-              {open.map((b, i) => (
-                <BookCard key={b.id} book={b} readNext={i === 0} />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
+      {!collapsed &&
+        (open.length === 0 ? (
+          <div className="books-empty">
+            No books in progress. Add the books you're reading in parallel and order them by priority.
+          </div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <SortableContext items={open.map((b) => b.id)} strategy={horizontalListSortingStrategy}>
+              <div className="books-row">
+                {open.map((b, i) => (
+                  <BookCard key={b.id} book={b} readNext={i === 0} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        ))}
     </div>
   );
 }

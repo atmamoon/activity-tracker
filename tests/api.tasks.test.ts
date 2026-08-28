@@ -59,6 +59,64 @@ describe('tasks API', () => {
     expect(undone.body.completed_at).toBeNull();
   });
 
+  it('auto-schedules a task created with no time, and back-to-back new tasks do not overlap', async () => {
+    const { body: t1 } = await request(ctx.app).post('/api/tasks').send({ date: today, title: 'a' });
+    expect(t1.planned_start).toBeTruthy();
+    expect(t1.planned_minutes).toBeGreaterThan(0);
+    expect(t1.auto_time).toBe(1);
+    const { body: t2 } = await request(ctx.app).post('/api/tasks').send({ date: today, title: 'b' });
+    expect(t2.planned_start).not.toBe(t1.planned_start);
+  });
+
+  it('an explicit time at creation is pinned (auto_time=0) and not touched by later scheduling', async () => {
+    const { body: t1 } = await request(ctx.app)
+      .post('/api/tasks')
+      .send({ date: today, title: 'fixed', planned_start: '09:00', planned_minutes: 30 });
+    expect(t1.auto_time).toBe(0);
+    await request(ctx.app).post('/api/tasks').send({ date: today, title: 'auto' });
+    const after = await request(ctx.app).get(`/api/day/${today}`);
+    const fixed = after.body.tasks.find((t: any) => t.id === t1.id);
+    expect(fixed.planned_start).toBe('09:00');
+  });
+
+  it('resubmitting the same time via PATCH does not pin an auto-scheduled task', async () => {
+    const { body: t1 } = await request(ctx.app).post('/api/tasks').send({ date: today, title: 'a' });
+    expect(t1.auto_time).toBe(1);
+    // Edit modal always sends planned_start; resubmitting the unchanged value
+    // must not remove the task from future reflows.
+    const patched = await request(ctx.app)
+      .patch(`/api/tasks/${t1.id}`)
+      .send({ title: 'a (renamed)', planned_start: t1.planned_start, planned_minutes: t1.planned_minutes });
+    expect(patched.body.auto_time).toBe(1);
+  });
+
+  it('changing the time via PATCH pins the task; clearing it releases it back to auto', async () => {
+    const { body: t1 } = await request(ctx.app).post('/api/tasks').send({ date: today, title: 'a' });
+    const pinned = await request(ctx.app)
+      .patch(`/api/tasks/${t1.id}`)
+      .send({ planned_start: '20:00' });
+    expect(pinned.body.auto_time).toBe(0);
+    expect(pinned.body.planned_start).toBe('20:00');
+
+    const released = await request(ctx.app)
+      .patch(`/api/tasks/${t1.id}`)
+      .send({ planned_start: null });
+    expect(released.body.auto_time).toBe(1);
+  });
+
+  it('reordering re-sequences auto-scheduled times to match the new queue order', async () => {
+    const { body: a } = await request(ctx.app).post('/api/tasks').send({ date: today, title: 'a' });
+    const { body: b } = await request(ctx.app).post('/api/tasks').send({ date: today, title: 'b' });
+    expect(a.planned_start < b.planned_start).toBe(true);
+
+    const res = await request(ctx.app)
+      .post(`/api/days/${today}/reorder`)
+      .send({ taskIds: [b.id, a.id] });
+    const byId = Object.fromEntries(res.body.tasks.map((t: any) => [t.id, t]));
+    // b now comes first in the queue, so it should get the earlier time.
+    expect(byId[b.id].planned_start < byId[a.id].planned_start).toBe(true);
+  });
+
   it('reorders a day and appends unlisted tasks after listed ones', async () => {
     const ids: string[] = [];
     for (const title of ['a', 'b', 'c', 'd']) {

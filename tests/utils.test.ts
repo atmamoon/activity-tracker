@@ -22,6 +22,7 @@ const baseTask: Task = {
   position: 10,
   planned_start: null,
   planned_minutes: null,
+  auto_time: 1,
   calendar_event_id: null,
   calendar_id: null,
   template_id: null,

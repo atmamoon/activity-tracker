@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   position REAL NOT NULL,
   planned_start TEXT,
   planned_minutes INTEGER,
+  auto_time INTEGER NOT NULL DEFAULT 1,
   calendar_event_id TEXT,
   calendar_id TEXT,
   template_id TEXT,
@@ -103,8 +104,20 @@ export function openDb(dbPath: string): DB {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   db.exec(SCHEMA);
+  migrate(db);
   seedDefaults(db);
   return db;
+}
+
+/** One-time upgrades for databases created before a schema addition. */
+function migrate(db: DB) {
+  const cols = db.prepare('PRAGMA table_info(tasks)').all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === 'auto_time')) {
+    db.exec('ALTER TABLE tasks ADD COLUMN auto_time INTEGER NOT NULL DEFAULT 1');
+    // Tasks that already had an explicit time before auto-scheduling existed
+    // are treated as pinned, so they are never silently moved by a reflow.
+    db.exec('UPDATE tasks SET auto_time = 0 WHERE planned_start IS NOT NULL');
+  }
 }
 
 function seedDefaults(db: DB) {

@@ -13,6 +13,7 @@ export interface Task {
   position: number;
   planned_start: string | null; // HH:MM (local, 24h)
   planned_minutes: number | null;
+  auto_time: 0 | 1; // 1 = system may reschedule it; 0 = user-pinned time
   calendar_event_id: string | null;
   calendar_id: string | null;
   template_id: string | null;

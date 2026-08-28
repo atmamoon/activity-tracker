@@ -9,6 +9,21 @@ import { materializeDay, localToday } from '../lib/materialize.ts';
 import { eventsForDay } from '../lib/sync.ts';
 import { isValidDateStr, isValidTimeStr } from '../lib/time.ts';
 import { syncTaskEvent, removeTaskEvent } from '../lib/taskEvents.ts';
+import { scheduleNewly, reflowDay } from '../lib/schedule.ts';
+
+/** Push a reflowed task's new time to its linked calendar event, if any. */
+async function syncReflowed(db: DB, google: GoogleClient, changed: any[]): Promise<string[]> {
+  const warnings: string[] = [];
+  for (const t of changed) {
+    if (!t.calendar_event_id) continue;
+    try {
+      await syncTaskEvent(db, google, t);
+    } catch (err) {
+      warnings.push(`"${t.title}": calendar event not updated (${(err as Error).message})`);
+    }
+  }
+  return warnings;
+}
 
 const createSchema = z.object({
   date: z.string().refine(isValidDateStr, 'invalid date'),
@@ -54,8 +69,8 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
     const id = randomUUID();
     db.prepare(
       `INSERT INTO tasks (id, date, title, notes, category_id, book_id, status, position,
-         planned_start, planned_minutes, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'todo', ?, ?, ?, ?)`
+         planned_start, planned_minutes, auto_time, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'todo', ?, ?, ?, ?, ?)`
     ).run(
       id,
       b.date,
@@ -66,8 +81,12 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
       nextTaskPosition(db, b.date),
       b.planned_start ?? null,
       b.planned_minutes ?? null,
+      b.planned_start ? 0 : 1,
       nowIso()
     );
+    // No time given — find it a free slot automatically (never touches
+    // other tasks that already have a time, so this can't cause jitter).
+    if (!b.planned_start) scheduleNewly(db, b.date);
     res.status(201).json(getTask(id));
   });
 
@@ -85,18 +104,31 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
       values.push(val);
     };
 
-    for (const key of ['title', 'notes', 'category_id', 'book_id', 'planned_start', 'planned_minutes'] as const) {
+    for (const key of ['title', 'notes', 'category_id', 'book_id', 'planned_minutes'] as const) {
       if (key in b) set(key, (b as any)[key]);
     }
-    if (b.status !== undefined && b.status !== task.status) {
+    // Pin the time only when it actually changes — an edit-modal save that
+    // resubmits the same (auto-assigned) time must not remove the task from
+    // future reflows just because the field was present in the body.
+    const timeChanged = 'planned_start' in b && b.planned_start !== task.planned_start;
+    if (timeChanged) {
+      set('planned_start', b.planned_start);
+      set('auto_time', b.planned_start === null ? 1 : 0);
+    }
+    const statusChanged = b.status !== undefined && b.status !== task.status;
+    if (statusChanged) {
       set('status', b.status);
       set('completed_at', b.status === 'done' ? nowIso() : null);
     }
-    if (b.date !== undefined && b.date !== task.date) {
+    const dateChanged = b.date !== undefined && b.date !== task.date;
+    if (dateChanged) {
       set('date', b.date);
-      set('position', nextTaskPosition(db, b.date));
+      set('position', nextTaskPosition(db, b.date as string));
       if (!task.carried_from) set('carried_from', task.date);
     }
+    // Only reflow when something scheduling-relevant actually changed — a
+    // plain title/notes/category edit shouldn't reshuffle the rest of the day.
+    const schedulingRelevant = timeChanged || statusChanged || dateChanged || 'planned_minutes' in b;
     if (fields.length > 0) {
       values.push(task.id);
       db.prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...values);
@@ -117,20 +149,33 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
       // syncTaskEvent may unlink the event (e.g. time removed) — re-read.
       updated = getTask(task.id);
     }
+
+    // Reflow siblings: pinning/releasing this task's time, or moving it to a
+    // new date, can free up or occupy a slot other auto-scheduled tasks
+    // should react to.
+    if (schedulingRelevant) {
+      const reflowWarnings = await syncReflowed(db, google, reflowDay(db, updated.date));
+      if (reflowWarnings.length) {
+        warning = [warning, ...reflowWarnings].filter(Boolean).join('; ');
+      }
+      updated = getTask(task.id);
+    }
     res.json(warning ? { ...updated, _warning: warning } : updated);
   });
 
-  router.post('/days/:date/reorder', (req, res) => {
+  router.post('/days/:date/reorder', async (req, res) => {
     const date = req.params.date;
     if (!isValidDateStr(date)) return res.status(400).json({ error: 'invalid date' });
     const schema = z.object({ taskIds: z.array(z.string()).max(500) });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'taskIds must be an array' });
     reorderDay(db, date, parsed.data.taskIds);
+    // New queue order — re-sequence auto-scheduled times to match it.
+    const warnings = await syncReflowed(db, google, reflowDay(db, date));
     const tasks = db
       .prepare('SELECT * FROM tasks WHERE date = ? ORDER BY position, created_at')
       .all(date);
-    res.json({ date, tasks });
+    res.json(warnings.length ? { date, tasks, warnings } : { date, tasks });
   });
 
   router.get('/days/:date/carryover', (req, res) => {
@@ -169,6 +214,9 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
         }
       }
     }
+    // Carried-in auto tasks land without a sensible time on the new day —
+    // pack them (and any other auto tasks already there) into free slots.
+    warnings.push(...(await syncReflowed(db, google, reflowDay(db, date))));
     const tasks = db
       .prepare('SELECT * FROM tasks WHERE date = ? ORDER BY position, created_at')
       .all(date);

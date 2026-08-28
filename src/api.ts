@@ -53,7 +53,7 @@ export const api = {
       { method: 'DELETE' }
     ),
   reorderDay: (date: string, taskIds: string[]) =>
-    request<{ tasks: Task[] }>(`/days/${date}/reorder`, {
+    request<{ tasks: Task[]; warnings?: string[] }>(`/days/${date}/reorder`, {
       method: 'POST',
       body: JSON.stringify({ taskIds }),
     }),

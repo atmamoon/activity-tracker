@@ -51,3 +51,18 @@ export function isValidTimeStr(s: unknown): s is string {
   const [hh, mm] = s.split(':').map(Number);
   return hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59;
 }
+
+/** Local date as YYYY-MM-DD. */
+export function localToday(): string {
+  return localDateStr(new Date());
+}
+
+export function hhmmToMinutes(hhmm: string): number {
+  const [hh, mm] = hhmm.split(':').map(Number);
+  return hh * 60 + mm;
+}
+
+export function minutesToHhmm(mins: number): string {
+  const clamped = Math.max(0, Math.min(24 * 60 - 1, Math.round(mins)));
+  return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`;
+}

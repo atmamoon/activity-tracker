@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { DB } from '../db.ts';
 import { nowIso } from '../db.ts';
 import { nextTaskPosition } from './order.ts';
+import { scheduleNewly } from './schedule.ts';
+
+export { localToday } from './time.ts';
 
 /**
  * Seed a day with tasks from active templates matching its weekday.
@@ -28,8 +31,8 @@ export function materializeDay(db: DB, date: string, todayDate: string) {
   const markSeeded = db.prepare('INSERT INTO day_seeds (date, template_id) VALUES (?, ?)');
   const insertTask = db.prepare(`
     INSERT INTO tasks (id, date, title, notes, category_id, status, position,
-      planned_start, planned_minutes, template_id, created_at)
-    VALUES (?, ?, ?, '', ?, 'todo', ?, ?, ?, ?, ?)
+      planned_start, planned_minutes, template_id, auto_time, created_at)
+    VALUES (?, ?, ?, '', ?, 'todo', ?, ?, ?, ?, ?, ?)
   `);
 
   const tx = db.transaction(() => {
@@ -51,24 +54,19 @@ export function materializeDay(db: DB, date: string, todayDate: string) {
         t.planned_start,
         t.planned_minutes,
         t.id,
+        t.planned_start ? 0 : 1,
         nowIso()
       );
       markSeeded.run(date, t.id);
     }
   });
   tx();
+  // Give any newly-seeded, still-untimed blocks a slot right away.
+  scheduleNewly(db, date);
 }
 
 /** Weekday (0=Sun..6=Sat) of a YYYY-MM-DD date, timezone-safe. */
 export function weekdayOf(date: string): number {
   const [y, m, d] = date.split('-').map(Number);
   return new Date(y, m - 1, d).getDay();
-}
-
-/** Local date as YYYY-MM-DD. */
-export function localToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-    d.getDate()
-  ).padStart(2, '0')}`;
 }

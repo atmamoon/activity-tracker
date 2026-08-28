@@ -737,13 +737,45 @@ a {
   background: color-mix(in srgb, var(--cat-color) 20%, var(--bg-elevated));
   border-color: color-mix(in srgb, var(--cat-color) 55%, transparent);
   color: var(--text);
-  cursor: pointer;
+  cursor: grab;
+  user-select: none;
 }
 .tl-block.task:hover {
   filter: brightness(1.06);
 }
 .tl-block.task.done {
   opacity: 0.55;
+  cursor: pointer;
+}
+.tl-block.dragging {
+  cursor: grabbing;
+  z-index: 15;
+  box-shadow: var(--shadow-lg);
+  filter: brightness(1.1);
+}
+.tl-resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+.tl-resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--cat-color) 70%, var(--text-faint));
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.tl-block.task:hover .tl-resize-handle::after {
+  opacity: 0.7;
 }
 .tl-block-label {
   font-weight: 600;
@@ -790,16 +822,38 @@ a {
   box-shadow: var(--shadow);
   padding: 12px 14px;
 }
+.books-shelf.collapsed {
+  padding-bottom: 12px;
+}
 .books-head {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.books-shelf:not(.collapsed) .books-head {
   margin-bottom: 10px;
+}
+.books-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+.books-collapse-toggle:hover {
+  background: var(--bg-inset);
 }
 .books-sub {
   font-size: 11.5px;
   color: var(--text-faint);
   flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.books-sub.collapsed-summary b {
+  color: var(--text);
+  font-weight: 600;
 }
 .books-row {
   display: flex;
