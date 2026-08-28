@@ -10,6 +10,8 @@ export default function Header() {
   const syncNow = useStore((s) => s.syncNow);
   const calendar = useStore((s) => s.calendar);
   const setSettingsOpen = useStore((s) => s.setSettingsOpen);
+  const view = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
 
   const connected = calendar && calendar.mode !== 'none' && (calendar.googleConnected || Boolean(calendar.icsUrl));
 
@@ -18,26 +20,46 @@ export default function Header() {
       <div className="header-brand">
         <span className="brand-mark">🎯</span>
         <span className="brand-name">Activity Tracker</span>
+        <nav className="view-tabs">
+          <button
+            className={`view-tab ${view === 'planner' ? 'active' : ''}`}
+            onClick={() => setView('planner')}
+          >
+            Planner
+          </button>
+          <button
+            className={`view-tab ${view === 'history' ? 'active' : ''}`}
+            onClick={() => setView('history')}
+          >
+            Past activity
+          </button>
+        </nav>
       </div>
 
       <div className="header-date">
-        <button className="icon-btn" onClick={() => shiftDay(-1)} title="Previous day (←)" aria-label="Previous day">
-          ‹
-        </button>
-        <button
-          className={`date-heading ${date === today ? 'is-today' : ''}`}
-          onClick={goToday}
-          title="Jump to today (t)"
-        >
-          {formatDateHeading(date, today)}
-        </button>
-        <button className="icon-btn" onClick={() => shiftDay(1)} title="Next day (→)" aria-label="Next day">
-          ›
-        </button>
-        {date !== today && (
-          <button className="pill-btn subtle" onClick={goToday}>
-            Back to today
-          </button>
+        {view === 'planner' ? (
+          <>
+            <button className="icon-btn" onClick={() => shiftDay(-1)} title="Previous day (←)" aria-label="Previous day">
+              ‹
+            </button>
+            <button
+              className={`date-heading ${date === today ? 'is-today' : ''}`}
+              onClick={goToday}
+              title="Jump to today (t)"
+            >
+              {formatDateHeading(date, today)}
+            </button>
+            <button className="icon-btn" onClick={() => shiftDay(1)} title="Next day (→)" aria-label="Next day">
+              ›
+            </button>
+            {date !== today && (
+              <button className="pill-btn subtle" onClick={goToday}>
+                Back to today
+              </button>
+            )}
+          </>
+        ) : (
+          <span className="date-heading">Past activity</span>
         )}
       </div>
 

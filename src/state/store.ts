@@ -9,7 +9,11 @@ export interface Toast {
   message: string;
 }
 
+export type AppView = 'planner' | 'history';
+
 interface StoreState {
+  view: AppView;
+  setView(view: AppView): void;
   today: string;
   date: string;
   tasks: Task[];
@@ -87,6 +91,10 @@ export const useStore = create<StoreState>((set, get) => {
   };
 
   return {
+    view: 'planner',
+    setView(view) {
+      set({ view });
+    },
     today: localDateStr(),
     date: localDateStr(),
     tasks: [],

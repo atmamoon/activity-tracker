@@ -94,3 +94,87 @@ export interface DayPayload {
   tasks: Task[];
   events: CalendarEvent[];
 }
+
+export type EntryStatus = 'done' | 'skipped' | 'missed' | 'planned' | 'removed';
+
+export interface HistoryEntry {
+  id: string;
+  task_id: string | null;
+  date: string;
+  title: string;
+  category_id: string | null;
+  category_name: string | null;
+  category_color: string | null;
+  category_emoji: string | null;
+  book_title: string | null;
+  planned_start: string | null;
+  planned_minutes: number | null;
+  status: EntryStatus;
+  completed_at: string | null;
+  carried_from: string | null;
+  removed: boolean;
+}
+
+export interface HistoryDay {
+  date: string;
+  entries: HistoryEntry[];
+  summary: {
+    done: number;
+    skipped: number;
+    missed: number;
+    planned: number;
+    doneMinutes: number;
+  };
+}
+
+export interface HistoryPayload {
+  from: string;
+  to: string;
+  days: HistoryDay[];
+  total: number;
+}
+
+export interface CategoryStat {
+  id: string | null;
+  name: string;
+  color: string | null;
+  emoji: string | null;
+  planned: number;
+  done: number;
+  skipped: number;
+  missed: number;
+  doneMinutes: number;
+  share: number;
+}
+
+export interface ActivityStat {
+  title: string;
+  category_name: string | null;
+  category_color: string | null;
+  plannedDays: number;
+  doneDays: number;
+  missedDays: number;
+  skippedDays: number;
+  completionRate: number;
+  currentStreak: number;
+  lastDone: string | null;
+  doneMinutes: number;
+}
+
+export interface StatsPayload {
+  from: string;
+  to: string;
+  totals: {
+    activeDays: number;
+    planned: number;
+    done: number;
+    skipped: number;
+    missed: number;
+    pending: number;
+    doneMinutes: number;
+    completionRate: number;
+    avgMinutesPerActiveDay: number;
+  };
+  categories: CategoryStat[];
+  activities: ActivityStat[];
+}

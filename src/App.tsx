@@ -4,6 +4,7 @@ import Header from './components/Header';
 import DayQueue from './components/DayQueue';
 import Timeline from './components/Timeline';
 import BooksShelf from './components/BooksShelf';
+import History from './components/History';
 import TaskEditModal from './components/TaskEditModal';
 import BookEditModal from './components/BookEditModal';
 import SettingsModal from './components/SettingsModal';
@@ -17,6 +18,7 @@ export default function App() {
   const editingTask = useStore((s) => s.editingTask);
   const editingBook = useStore((s) => s.editingBook);
   const settingsOpen = useStore((s) => s.settingsOpen);
+  const view = useStore((s) => s.view);
 
   useEffect(() => {
     init();
@@ -40,7 +42,8 @@ export default function App() {
       const typing =
         target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
       const s = useStore.getState();
-      if (typing || s.editingTask || s.editingBook || s.settingsOpen) return;
+      // Day-navigation shortcuts only make sense on the planner.
+      if (typing || s.editingTask || s.editingBook || s.settingsOpen || s.view !== 'planner') return;
       if (e.key === 't') s.goToday();
       else if (e.key === 'ArrowLeft') s.shiftDay(-1);
       else if (e.key === 'ArrowRight') s.shiftDay(1);
@@ -56,15 +59,21 @@ export default function App() {
   return (
     <div className="app">
       <Header />
-      <main className="layout">
-        <section className="main-col">
-          <DayQueue />
-          <BooksShelf />
-        </section>
-        <aside className="side-col">
-          <Timeline />
-        </aside>
-      </main>
+      {view === 'history' ? (
+        <main className="layout single">
+          <History />
+        </main>
+      ) : (
+        <main className="layout">
+          <section className="main-col">
+            <DayQueue />
+            <BooksShelf />
+          </section>
+          <aside className="side-col">
+            <Timeline />
+          </aside>
+        </main>
+      )}
       {editingTask && <TaskEditModal />}
       {editingBook && <BookEditModal />}
       {settingsOpen && <SettingsModal />}

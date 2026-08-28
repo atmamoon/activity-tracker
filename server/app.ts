@@ -8,6 +8,7 @@ import { bookRoutes } from './routes/books.ts';
 import { templateRoutes } from './routes/templates.ts';
 import { categoryRoutes } from './routes/categories.ts';
 import { calendarRoutes } from './routes/calendar.ts';
+import { historyRoutes } from './routes/history.ts';
 
 export interface AppOptions {
   db: DB;
@@ -27,6 +28,7 @@ export function createApp({ db, port, fetchImpl, icsFetcher }: AppOptions) {
   app.use('/api', templateRoutes(db));
   app.use('/api', categoryRoutes(db));
   app.use('/api', calendarRoutes(db, google, port, icsFetcher));
+  app.use('/api', historyRoutes(db));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true }));
 

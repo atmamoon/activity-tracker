@@ -5,9 +5,29 @@ import type {
   Category,
   DayPayload,
   GoogleCalendarInfo,
+  HistoryPayload,
+  StatsPayload,
   Task,
   Template,
 } from '../shared/types';
+
+export interface HistoryQuery {
+  days?: number;
+  from?: string;
+  to?: string;
+  categoryId?: string;
+  status?: string;
+  q?: string;
+}
+
+function historyParams(query: HistoryQuery): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== '' && value !== 'all') params.set(key, String(value));
+  }
+  const s = params.toString();
+  return s ? `?${s}` : '';
+}
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -120,6 +140,9 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({}),
   }),
+  history: (query: HistoryQuery) => request<HistoryPayload>(`/history${historyParams(query)}`),
+  stats: (query: HistoryQuery) => request<StatsPayload>(`/stats${historyParams(query)}`),
+
   pushTask: (id: string) => request<Task>(`/tasks/${id}/push`, { method: 'POST' }),
   unpushTask: (id: string) => request<Task>(`/tasks/${id}/unpush`, { method: 'POST' }),
 };

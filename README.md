@@ -51,6 +51,30 @@ Open http://localhost:5173. The API runs on port 4820 (change with `API_PORT`).
 
 Shortcuts: `n` quick add · `t` today · `←`/`→` previous/next day.
 
+## Past activity
+
+The **Past activity** tab is the durable record of what you actually did.
+Every completion, skip, reopen, and deletion is written to an append-only
+`activity_log` table with a snapshot of the task's details — so history stays
+readable even after you rename a task, rename a category, or delete the task
+outright (removed items still show up, flagged as such).
+
+- **The log** — days newest-first, each entry showing its slot (start–end),
+  duration, category, book, whether it was carried over, and its outcome:
+  done / missed / skipped / upcoming. An unfinished task in the past reads as
+  **missed**, which is the signal for what's slipping.
+- **Filters** — date range (7/30/90 days, all time), category, status, and a
+  title search.
+- **Where the time goes** — share of logged time per category, plus a
+  consistency table per recurring activity (days done ÷ days planned, current
+  streak). This answers "what am I most consistent at", "what keeps getting
+  missed", and "what is eating my day".
+
+Note on the numbers: the summary tiles always describe the **whole date
+range**, not the filtered list below them. The completion rate is
+`done ÷ (done + missed)` — today's still-open tasks aren't counted as failures
+because the day isn't over yet.
+
 ## Calendar sync
 
 Two options, switchable in **Settings → Calendar**:
@@ -85,7 +109,7 @@ In Google Calendar → Settings → your calendar → *Integrate calendar*, copy
 ## Tests
 
 ```bash
-npm test          # 83 tests: API, scheduling engine, calendar sync (mocked Google), ICS parsing, UI
+npm test          # 96 tests: API, scheduling, history/stats, calendar sync (mocked Google), ICS, UI
 npm run typecheck
 ```
 

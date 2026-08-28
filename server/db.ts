@@ -83,6 +83,25 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- Append-only audit trail of what actually happened, with snapshots of the
+-- task's details at that moment so history survives renames, category
+-- changes, and task deletion.
+CREATE TABLE IF NOT EXISTS activity_log (
+  id TEXT PRIMARY KEY,
+  task_id TEXT,
+  date TEXT NOT NULL,
+  title TEXT NOT NULL,
+  category_id TEXT,
+  category_name TEXT,
+  book_id TEXT,
+  event TEXT NOT NULL CHECK (event IN ('done','skipped','reopened','deleted')),
+  planned_start TEXT,
+  planned_minutes INTEGER,
+  at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_log_date ON activity_log(date);
+CREATE INDEX IF NOT EXISTS idx_log_task ON activity_log(task_id);
 `;
 
 const DEFAULT_CATEGORIES: Array<{ name: string; color: string; emoji: string }> = [
@@ -117,6 +136,20 @@ function migrate(db: DB) {
     // Tasks that already had an explicit time before auto-scheduling existed
     // are treated as pinned, so they are never silently moved by a reflow.
     db.exec('UPDATE tasks SET auto_time = 0 WHERE planned_start IS NOT NULL');
+  }
+
+  // Seed the log from tasks completed before the log existed, so history is
+  // complete from day one. Only runs while the log is still empty.
+  const logged = (db.prepare('SELECT COUNT(*) AS c FROM activity_log').get() as { c: number }).c;
+  if (logged === 0) {
+    db.exec(`
+      INSERT INTO activity_log (id, task_id, date, title, category_id, category_name,
+        book_id, event, planned_start, planned_minutes, at)
+      SELECT lower(hex(randomblob(16))), t.id, t.date, t.title, t.category_id, c.name,
+        t.book_id, 'done', t.planned_start, t.planned_minutes, t.completed_at
+      FROM tasks t LEFT JOIN categories c ON c.id = t.category_id
+      WHERE t.status = 'done' AND t.completed_at IS NOT NULL
+    `);
   }
 }
 

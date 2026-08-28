@@ -10,6 +10,7 @@ import { eventsForDay } from '../lib/sync.ts';
 import { isValidDateStr, isValidTimeStr } from '../lib/time.ts';
 import { syncTaskEvent, removeTaskEvent } from '../lib/taskEvents.ts';
 import { scheduleNewly, reflowDay } from '../lib/schedule.ts';
+import { logActivity, eventForStatusChange } from '../lib/activityLog.ts';
 
 /** Push a reflowed task's new time to its linked calendar event, if any. */
 async function syncReflowed(db: DB, google: GoogleClient, changed: any[]): Promise<string[]> {
@@ -135,6 +136,11 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
     }
 
     let updated = getTask(task.id);
+    // Record the transition against the task's post-update details.
+    if (statusChanged) {
+      const event = eventForStatusChange(task.status, updated.status);
+      if (event) logActivity(db, updated, event, updated.completed_at ?? undefined);
+    }
     // Keep a pushed calendar event in sync with title/time/date edits.
     let warning: string | undefined;
     if (
@@ -234,6 +240,8 @@ export function taskRoutes(db: DB, google: GoogleClient): Router {
         warning = `Task deleted, but removing the calendar event failed: ${(err as Error).message}`;
       }
     }
+    // Log before deleting so the work stays visible in history.
+    logActivity(db, task, 'deleted');
     db.prepare('DELETE FROM tasks WHERE id = ?').run(task.id);
     res.json({ ok: true, warning });
   });
