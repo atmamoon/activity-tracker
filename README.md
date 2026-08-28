@@ -35,9 +35,19 @@ Open http://localhost:5173. The API runs on port 4820 (change with `API_PORT`).
 - **Books** — track the books you read in parallel, with page/chapter/percent
   progress. Drag cards to decide what to read next ("READ NEXT" tag). The
   **+ plan** button drops a reading task for that book into the current day.
+  The section is collapsed by default (click "📚 Reading" to expand) —
+  your choice sticks across reloads.
 - **Timeline** — the right panel shows your calendar events (striped = busy)
   and any tasks with a start time. Tasks that overlap a calendar event get an
   "⚠ overlaps" warning automatically. The red line is "now".
+  - **Auto-scheduling**: a task with no time gets one automatically — packed
+    into the next free slot between 8am–10pm, working around your calendar
+    events and other tasks. Reordering the queue re-sequences these times to
+    match.
+  - **Drag to move, drag the bottom edge to resize** — just like Google
+    Calendar. Either action pins that task's time (it won't be touched by
+    auto-scheduling again); a plain click still opens the edit modal. Clear
+    a task's time in the edit modal to hand it back to auto-scheduling.
 
 Shortcuts: `n` quick add · `t` today · `←`/`→` previous/next day.
 
@@ -75,7 +85,7 @@ In Google Calendar → Settings → your calendar → *Integrate calendar*, copy
 ## Tests
 
 ```bash
-npm test          # 59 tests: API, calendar sync (mocked Google), ICS parsing, UI
+npm test          # 83 tests: API, scheduling engine, calendar sync (mocked Google), ICS parsing, UI
 npm run typecheck
 ```
 
