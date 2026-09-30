@@ -3,7 +3,16 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Personal local-first activity tracker: day planner, practice queue, book tracker, Google Calendar sync",
+  "description": "Local-first day planner: reorderable task queue, auto-scheduling timeline, book tracker, activity history, and Google Calendar sync",
+  "license": "MIT",
+  "author": "Mamoon Mondal",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atmamoon/activity-tracker.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,magenta \"npm:dev:server\" \"npm:dev:client\"",
     "dev:server": "tsx watch server/index.ts",
