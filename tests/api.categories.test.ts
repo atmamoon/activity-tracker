@@ -9,15 +9,19 @@ beforeEach(() => {
 });
 
 describe('categories API', () => {
-  it('seeds the default practice/reading/job categories', async () => {
+  it('seeds the generic starter categories', async () => {
     const res = await request(ctx.app).get('/api/categories');
     const names = res.body.categories.map((c: any) => c.name);
-    expect(names).toContain('RCA Practice');
-    expect(names).toContain('Data Questions');
-    expect(names).toContain('Mental Math / Quant');
-    expect(names).toContain('Reading');
-    expect(names).toContain('Job Applications');
-    expect(names).toContain('Interview');
+    expect(names).toEqual([
+      'Deep work',
+      'Drills',
+      'Reading',
+      'Fitness',
+      'Side project',
+      'Meetings',
+      'Admin',
+      'Other',
+    ]);
   });
 
   it('creates, renames, recolors, and archives a category', async () => {

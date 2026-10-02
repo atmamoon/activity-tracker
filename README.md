@@ -5,10 +5,10 @@ reorderable task queue for each day, recurring daily blocks, a tracker for
 books you read in parallel, a timeline that schedules itself around your
 calendar, and a history of what you actually got done.
 
-It was built to structure a long interview-prep grind (practice problems,
-reading, applications, interviews), but the categories are yours to rename.
-It works just as well for studying, side projects, or any routine you want to
-stick to.
+It was built to keep a stretch of daily drills honest alongside an existing
+routine, after hour-by-hour planning kept steering the day toward the easy
+tasks. The categories are yours to rename: it works just as well for studying,
+side projects, or any routine you want to stick to.
 
 > **Your data never leaves your machine.** Everything lives in one SQLite
 > file. There's no cloud backend, no account, and no telemetry.
@@ -48,6 +48,31 @@ stick to.
 
 ---
 
+## Screenshots
+
+The planner: the first unfinished task is the **NOW** card, the rest of the
+queue sits under it, and the timeline on the right is packed around your
+calendar.
+
+![The planner with the NOW card and the timeline](docs/screenshots/01-planner.png)
+
+The timeline schedules untimed tasks into free slots; drag a block to pin it,
+drag its edge to resize it. The red line is now.
+
+![The timeline](docs/screenshots/03-timeline.png)
+
+Past activity: summary tiles over the append-only log, then where the time
+went and how consistent each activity has been.
+
+![Past activity summary](docs/screenshots/05-history.png)
+
+![Share of time by category and the consistency table](docs/screenshots/06-insights.png)
+
+> These are a real five-week log with the activities renamed. The numbers are
+> unchanged.
+
+---
+
 ## Quick start
 
 **Requirements:** Node.js 20+ (developed on Node 24) and npm.
@@ -61,7 +86,9 @@ npm run dev
 
 Open **http://localhost:5173**. The API runs on port `4820`, and the
 database is created automatically at `data/tracker.db` on first launch, with
-a starter set of categories.
+a starter set of categories (Deep work, Drills, Reading, Fitness, Side
+project, Meetings, Admin, Other). Rename them to your own routine in
+**Settings → Categories**.
 
 ### Production mode
 

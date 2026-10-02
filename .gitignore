@@ -18,3 +18,6 @@ data/
 *.log
 .DS_Store
 coverage/
+
+# publishing drafts (articles, notes) — not part of the app
+publish/

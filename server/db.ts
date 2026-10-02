@@ -104,14 +104,16 @@ CREATE INDEX IF NOT EXISTS idx_log_date ON activity_log(date);
 CREATE INDEX IF NOT EXISTS idx_log_task ON activity_log(task_id);
 `;
 
+// Starter categories for a fresh database. Rename, recolor, or archive them in
+// Settings; this list only matters the first time the app opens.
 const DEFAULT_CATEGORIES: Array<{ name: string; color: string; emoji: string }> = [
-  { name: 'RCA Practice', color: '#e05d44', emoji: '🔍' },
-  { name: 'Data Questions', color: '#3b82f6', emoji: '📊' },
-  { name: 'Mental Math / Quant', color: '#8b5cf6', emoji: '🧮' },
+  { name: 'Deep work', color: '#8b5cf6', emoji: '🧠' },
+  { name: 'Drills', color: '#e05d44', emoji: '🎯' },
   { name: 'Reading', color: '#10b981', emoji: '📖' },
-  { name: 'Job Applications', color: '#f59e0b', emoji: '📨' },
-  { name: 'Interview', color: '#ec4899', emoji: '🎤' },
-  { name: 'Assessment', color: '#06b6d4', emoji: '📝' },
+  { name: 'Fitness', color: '#f59e0b', emoji: '🏋️' },
+  { name: 'Side project', color: '#3b82f6', emoji: '🛠️' },
+  { name: 'Meetings', color: '#ec4899', emoji: '🎤' },
+  { name: 'Admin', color: '#06b6d4', emoji: '📨' },
   { name: 'Other', color: '#64748b', emoji: '⚡' },
 ];
 
